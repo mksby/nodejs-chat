@@ -1,0 +1,16 @@
+{
+  "name" : "MacPherson nodejs",
+  "version" : "0.0.1",
+  "dependencies" : {
+    "express" : "3.3.x",
+    "async": "latest",
+    "bower": "latest",
+    "crypto": "latest",
+    "ejs": "latest",
+    "ejs-locals": "latest",
+    "mongodb": "latest",
+    "mongoose": "latest",
+    "nconf": "latest",
+    "winston": "latest"
+  }
+}
