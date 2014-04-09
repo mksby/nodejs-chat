@@ -2,7 +2,9 @@ var express = require('express'),
 	http = require('http'),
 	path = require('path'),
 	config = require(__dirname + '/config'),
-	log = require(__dirname + '/libs/log')(module);
+	log = require(__dirname + '/libs/log')(module),
+	mongoose = require(__dirname + '/libs/mongoose'),
+	HttpError = require(__dirname + '/error').HttpError;
 
 app = express();
 
@@ -18,30 +20,47 @@ if (app.get('env') === 'development') {
 };
 app.use(express.bodyParser());
 app.use(express.cookieParser());
+
+var sessionStore = require(__dirname + '/libs/sessionStore');
+
+app.use(express.session({
+	secret: config.get('session:secret'),
+	key: config.get('session:key'),
+	cookie: config.get('session:coockie'),
+	store: sessionStore
+}));
+
+app.use(require(__dirname + '/middleware/sendHttpError'));
+app.use(require(__dirname + '/middleware/loadUser'));
+
 app.use(app.router);
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.get('/', function(req, res, next) {
-	res.render('index')
+require(__dirname + '/routes')(app);
+
+app.use(function(err, req, res, next) {
+	if (typeof err === 'number') {
+		err = new HttpError(err);
+	};
+
+	if (err instanceof HttpError) {
+		res.sendHttpError(err);
+	} else {
+		if (app.get('env') === 'development') {
+			express.errorHandler()(err, req, res, next);
+		} else {
+			log.error(err);
+			err = new HttpError(500);
+			res.sendHttpError(err);
+		}
+	}
+
 });
 
-var User = require(__dirname + '/models/user').User;
-app.get('/users', function(req, res, next) {
-	User.find({}, function(err, users) {
-		if (err) return next(err);
-		res.json(users);
-	});
-});
-
-http.createServer(app).listen(config.get('port'), function() {
+var server = http.createServer(app);
+server.listen(config.get('port'), function() {
 	log.info('Express server listening in port ' +  config.get('port'))
 });
 
-app.use(function(err, req, res, next) {
-	if (app.get('env') === 'development') {
-		var errorHandler = express.errorHandler();
-		errorHandler(err, req, res, next);
-	} else {
-		res.end(500);
-	}
-});
+var io = require(__dirname + '/socket')(server);
+app.set('io', io);
